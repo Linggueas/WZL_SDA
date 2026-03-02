@@ -30,7 +30,7 @@
     <normaloff>:/new/prefix1/serial.png</normaloff>:/new/prefix1/serial.png</iconset>
   </property>
   <property name="styleSheet">
-   <string notr="true"/>
+   <string notr="true">background-color: rgb(255, 255, 255);</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -192,6 +192,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_4">
                <item>
                 <widget class="QCheckBox" name="checkBox_4">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -265,6 +268,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_8">
                <item>
                 <widget class="QCheckBox" name="checkBox_7">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -298,6 +304,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_6">
                <item>
                 <widget class="QCheckBox" name="checkBox_3">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -359,6 +368,9 @@
                 </property>
                 <item>
                  <widget class="QCheckBox" name="while_checkBox">
+                  <property name="styleSheet">
+                   <string notr="true">background-color: rgb();</string>
+                  </property>
                   <property name="text">
                    <string>循环发送</string>
                   </property>
@@ -424,6 +436,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_1">
                <item>
                 <widget class="QCheckBox" name="checkBox_1">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -457,6 +472,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_2">
                <item>
                 <widget class="QCheckBox" name="checkBox_2">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -490,6 +508,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_5">
                <item>
                 <widget class="QCheckBox" name="checkBox_5">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -523,6 +544,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_7">
                <item>
                 <widget class="QCheckBox" name="checkBox_6">
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string/>
                  </property>
@@ -950,6 +974,9 @@
                    <height>20</height>
                   </rect>
                  </property>
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string>接收时间</string>
                  </property>
@@ -963,11 +990,14 @@
                    <height>20</height>
                   </rect>
                  </property>
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb();</string>
+                 </property>
                  <property name="text">
                   <string>HEX显示</string>
                  </property>
                 </widget>
-                <widget class="QPushButton" name="run_time_pushButton">
+                <widget class="QPushButton" name="data_show_pushButton">
                  <property name="geometry">
                   <rect>
                    <x>240</x>
@@ -977,7 +1007,7 @@
                   </rect>
                  </property>
                  <property name="text">
-                  <string>运行模式</string>
+                  <string>可视化模式</string>
                  </property>
                 </widget>
                 <widget class="QPushButton" name="down_time_pushButton">
@@ -1037,6 +1067,9 @@
                       <height>16777215</height>
                      </size>
                     </property>
+                    <property name="styleSheet">
+                     <string notr="true">background-color: rgb();</string>
+                    </property>
                     <property name="text">
                      <string>定时发送</string>
                     </property>
@@ -1076,6 +1109,9 @@
                       <height>16777215</height>
                      </size>
                     </property>
+                    <property name="styleSheet">
+                     <string notr="true">background-color: rgb();</string>
+                    </property>
                     <property name="text">
                      <string>发送新行</string>
                     </property>
@@ -1088,6 +1124,9 @@
                       <width>70</width>
                       <height>16777215</height>
                      </size>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true">background-color: rgb();</string>
                     </property>
                     <property name="text">
                      <string>HEX发送</string>

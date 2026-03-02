@@ -1,5 +1,6 @@
 #include "serialmgr.h"
-SerialMgr* SerialMgr::ser_mgr = nullptr;
+#include <QThread>
+std::shared_ptr<SerialMgr> SerialMgr::ser_mgr = nullptr;
 SerialMgr::SerialMgr(QObject *parent)
     : QObject{parent}
 {
@@ -13,7 +14,7 @@ SerialMgr::~SerialMgr()
 }
 
 
-QList<QSerialPortInfo> SerialMgr::get_now_port()
+void SerialMgr::get_now_port()
 {
     QList<QSerialPortInfo> portlist = QSerialPortInfo::availablePorts();
     now_port.clear();
@@ -21,19 +22,19 @@ QList<QSerialPortInfo> SerialMgr::get_now_port()
     {
         now_port.push_back(portlist[i]);
     }
-    return portlist;
+    emit sig_get_port(portlist);
 }
 
-SerialMgr*SerialMgr::GetInstance()
+std::shared_ptr<SerialMgr> SerialMgr::GetInstance()
 {
     if(ser_mgr == nullptr)
     {
-        ser_mgr = new SerialMgr();
+        ser_mgr = std::shared_ptr<SerialMgr>(new SerialMgr(nullptr));
     }
     return ser_mgr;
 }
 
-bool SerialMgr::openSerial(QString serialNum, QString serialBaud, QString serialData, QString serialVerify, QString serialStop, QString serialStream)
+void SerialMgr::openSerial(QString serialNum, QString serialBaud, QString serialData, QString serialVerify, QString serialStop, QString serialStream)
 {
     serialport->setPortName(serialNum);
     serialport->setBaudRate(serialBaud.toInt());
@@ -72,11 +73,14 @@ bool SerialMgr::openSerial(QString serialNum, QString serialBaud, QString serial
     {
         serialport->setFlowControl(QSerialPort::FlowControl::HardwareControl);
     }
+
     if(!serialport->open(QIODevice::ReadWrite))
     {
-        return false;
+        QThread::msleep(50);
+        emit connect_state(false);
+        return;
     }
-    return true;
+    emit connect_state(true);
 
 }
 

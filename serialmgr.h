@@ -4,33 +4,38 @@
 #include <QObject>
 #include <QSerialPort>
 #include <QSerialPortInfo>
+#include <memory>
+class MainWindow;
 class SerialMgr : public QObject
 {
+    friend MainWindow;
     Q_OBJECT
 public:
-    explicit SerialMgr(QObject *parent = nullptr);
     ~SerialMgr();
-    static SerialMgr*GetInstance();
-    QList<QSerialPortInfo> get_now_port();
-    bool openSerial(QString serialNum,
-                    QString serialBaud,
-                    QString serialData,
-                    QString serialVerify,
-                    QString serialStop,
-                    QString serialStream);
-    void closeSerial();
-    void send_data(const QString&data);
+    static std::shared_ptr<SerialMgr> GetInstance();
 private:
+    explicit SerialMgr(QObject *parent = nullptr);
     QList<QSerialPortInfo>now_port;
-    static SerialMgr *ser_mgr;
+    static std::shared_ptr<SerialMgr>ser_mgr;
     QSerialPort *serialport;
 
 
 
 private slots:
     void read_data();
+    void send_data(const QString&data);
+    void openSerial(QString serialNum,
+                    QString serialBaud,
+                    QString serialData,
+                    QString serialVerify,
+                    QString serialStop,
+                    QString serialStream);
+    void closeSerial();
+    void get_now_port();
 signals:
     void sig_read_data(QByteArray data);
+    void connect_state(bool _bool);
+    void sig_get_port(QList<QSerialPortInfo>);
 };
 
 #endif // SERIALMGR_H

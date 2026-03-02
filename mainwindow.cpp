@@ -8,7 +8,7 @@
 #include "QJsonObject"
 #include "QJsonArray"
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),if_open(false),his_open(true),more_text_open(true)
+    : QMainWindow(parent),if_open(false),his_open(true),more_text_open(true),data_show_open(false)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
@@ -16,20 +16,23 @@ MainWindow::MainWindow(QWidget *parent)
     ui->time_checkBox->setEnabled(false);
     timer = new QTimer(this);
     more_text_timer = new QTimer(this);
-    connect(SerialMgr::GetInstance(),&SerialMgr::sig_read_data,this,&MainWindow::read_data);
+    //数据可视化
+    ds_dlg = new DataShowDialog(this);
+    ui->verticalLayout_2->insertWidget(0,ds_dlg);
+    ds_dlg->hide();
+    //线程
+    serial_thread = new QThread(this);
+    SerialMgr::GetInstance()->moveToThread(serial_thread);
+    serial_thread->start();
 
     connect(timer,&QTimer::timeout,this,[this](){
-        SerialMgr::GetInstance()->send_data("这是定时发送");
+        emit sig_write(ui->send_lineEdit->text());
     });
-
+    //串口checkbox
     connect(ui->serial_comboBox,&MyComboBox::refresh,this,[this](){
+        serial_index = ui->serial_comboBox->currentIndex();
         ui->serial_comboBox->clear();
-        QList<QSerialPortInfo> portlist =  SerialMgr::GetInstance()->get_now_port();
-        for(QSerialPortInfo port : portlist)
-        {
-            QString port_name = port.portName();
-            ui->serial_comboBox->addItem(port_name);
-        }
+        emit sig_get_port();
     });
 
     //处理多文本
@@ -65,45 +68,15 @@ MainWindow::MainWindow(QWidget *parent)
     }
     //多文本循环发送
     connect(more_text_timer,&QTimer::timeout,this,&MainWindow::while_send_text);
-}
-
-MainWindow::~MainWindow()
-{
-    delete ui;
-}
-
-void MainWindow::on_open_stop_pushButton_clicked()
-{
-    if(if_open)
-    {
-        if_open = false;
-        ui->open_stop_pushButton->setText("打开串口");
-        SerialMgr::GetInstance()->closeSerial();
-
-        ui->serial_comboBox->setEnabled(true);
-        ui->Baud_comboBox->setEnabled(true);
-        ui->data_comboBox->setEnabled(true);
-        ui->Verify_comboBox->setEnabled(true);
-        ui->stop_comboBox->setEnabled(true);
-        ui->stream_control_comboBox->setEnabled(true);
-        ui->send_pushButton->setEnabled(false);
-        ui->time_checkBox->setEnabled(false);
-        QMessageBox::information(this,"成功","关闭成功");
-        timer->stop();
-    }else
-    {
-        bool en = SerialMgr::GetInstance()->openSerial(ui->serial_comboBox->currentText(),
-                                             ui->Baud_comboBox->currentText(),
-                                             ui->data_comboBox->currentText(),
-                                             ui->Verify_comboBox->currentText(),
-                                             ui->stop_comboBox->currentText(),
-                                             ui->stream_control_comboBox->currentText());
-
-        if(!en)
+    //串口信号槽连接
+    connect(SerialMgr::GetInstance().get(),&SerialMgr::connect_state,this,[this](bool _bool){
+        if(!_bool)
         {
             QMessageBox::critical(this,"失败","连接失败");
 
-        }else{
+
+        }else
+        {
             QMessageBox::information(this,"成功","连接成功");
             ui->open_stop_pushButton->setText("关闭串口");
             ui->serial_comboBox->setEnabled(false);
@@ -116,6 +89,61 @@ void MainWindow::on_open_stop_pushButton_clicked()
             ui->time_checkBox->setEnabled(true);
             if_open = true;
         }
+    },Qt::QueuedConnection);
+
+    connect(SerialMgr::GetInstance().get(),&SerialMgr::sig_get_port,this,[this](QList<QSerialPortInfo> portlist){
+
+        for(QSerialPortInfo port : portlist)
+        {
+
+            QString port_name = port.portName();
+            ui->serial_comboBox->addItem(port_name);
+
+        }
+        ui->serial_comboBox->setCurrentIndex(serial_index);
+        ui->serial_comboBox->showPopup();
+    });
+    connect(SerialMgr::GetInstance().get(),&SerialMgr::sig_read_data,this,&MainWindow::read_data,Qt::QueuedConnection);
+    connect(this,&MainWindow::sig_open_serial,SerialMgr::GetInstance().get(),&SerialMgr::openSerial,Qt::QueuedConnection);
+    connect(this,&MainWindow::sig_close_serial,SerialMgr::GetInstance().get(),&SerialMgr::closeSerial,Qt::QueuedConnection);
+    connect(this,&MainWindow::sig_get_port,SerialMgr::GetInstance().get(),&SerialMgr::get_now_port,Qt::QueuedConnection);
+    connect(this,&MainWindow::sig_write,SerialMgr::GetInstance().get(),&SerialMgr::send_data,Qt::QueuedConnection);
+}
+
+MainWindow::~MainWindow()
+{
+    serial_thread->quit();
+    serial_thread->wait();
+    delete ui;
+}
+
+void MainWindow::on_open_stop_pushButton_clicked()
+{
+    if(if_open)
+    {
+        if_open = false;
+        emit sig_close_serial();
+        ui->open_stop_pushButton->setText("打开串口");
+        ui->serial_comboBox->setEnabled(true);
+        ui->Baud_comboBox->setEnabled(true);
+        ui->data_comboBox->setEnabled(true);
+        ui->Verify_comboBox->setEnabled(true);
+        ui->stop_comboBox->setEnabled(true);
+        ui->stream_control_comboBox->setEnabled(true);
+        ui->send_pushButton->setEnabled(false);
+        ui->time_checkBox->setEnabled(false);
+        QMessageBox::information(this,"成功","关闭成功");
+        timer->stop();
+    }else
+    {
+        emit sig_open_serial(ui->serial_comboBox->currentText(),
+                                             ui->Baud_comboBox->currentText(),
+                                             ui->data_comboBox->currentText(),
+                                             ui->Verify_comboBox->currentText(),
+                                             ui->stop_comboBox->currentText(),
+                                             ui->stream_control_comboBox->currentText());
+
+
     }
 }
 
@@ -129,13 +157,13 @@ void MainWindow::on_send_pushButton_clicked()
     }
     if(ui->Hex_checkBox->isChecked())
     {
-        SerialMgr::GetInstance()->send_data(QByteArray::fromHex(send_text.toUtf8()));
+        emit sig_write(QString(QByteArray::fromHex(send_text.toUtf8())));
     }else
     {
         if(ui->save_new_checkBox->isChecked()){
             send_text.append("\r\n");
         }
-        SerialMgr::GetInstance()->send_data(send_text);
+        emit sig_write(send_text);
     }
 }
 
@@ -238,15 +266,14 @@ void MainWindow::on_more_text_send()
         return;
     }
     if(more_text_checkbox[index]->isChecked()){
-        SerialMgr::GetInstance()->
-            send_data(QByteArray::fromHex(more_text_lineedit[index]->text().toUtf8()));
+        emit sig_write(QString(QByteArray::fromHex(more_text_lineedit[index]->text().toUtf8())));
     }else{
         QString send_text = more_text_lineedit[index]->text();
         if(ui->save_new_checkBox->isChecked())
         {
             send_text.append("\r\n");
         }
-        SerialMgr::GetInstance()->send_data(send_text);
+        emit sig_write(send_text);
     }
 }
 
@@ -283,8 +310,7 @@ void MainWindow::while_send_text()
     }
     if(more_text_checkbox[more_text_index]->isChecked())
     {
-        SerialMgr::GetInstance()->
-            send_data(QByteArray::fromHex(more_text_lineedit[more_text_index]->text().toUtf8()));
+        emit sig_write(QString(QByteArray::fromHex(more_text_lineedit[more_text_index]->text().toUtf8())));
     }else
     {
         QString send_text = more_text_lineedit[more_text_index]->text();
@@ -292,7 +318,7 @@ void MainWindow::while_send_text()
         {
             send_text.append("\r\n");
         }
-        SerialMgr::GetInstance()->send_data(send_text);
+        emit sig_write(send_text);
 
     }
     more_text_index++;
@@ -347,6 +373,22 @@ void MainWindow::on_down_pushButton_clicked()
             more_text_lineedit[i]->setText(json_obj["text"].toString());
             more_text_checkbox[i]->setChecked(json_obj["ischeck"].toBool());
         }
+    }
+    file.close();
+}
+
+
+void MainWindow::on_data_show_pushButton_clicked()
+{
+    if(data_show_open)
+    {
+        data_show_open = false;
+        ds_dlg->hide();
+        ui->widget->show();
+    }else{
+        data_show_open = true;
+        ds_dlg->show();
+        ui->widget->hide();
     }
 }
 
