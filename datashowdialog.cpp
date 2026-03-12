@@ -56,6 +56,11 @@ DataShowDialog::~DataShowDialog()
     delete ui;
 }
 
+bool DataShowDialog::eventFilter(QObject *watched, QEvent *event)
+{
+    return QDialog::eventFilter(watched, event);
+}
+
 void DataShowDialog::on_mess_pushButton_clicked()
 {
     QMessageBox::information(this,"提示","请发送单个HEX,\n否则会出现界面的乱码");
@@ -135,27 +140,109 @@ void DataShowDialog::on_start_show_data(QByteArray data)
 void DataShowDialog::autoScroll()
 {
     int totalPoints = dataPoints.size();
-
-    if(totalPoints <= MAX_DISPLAY_POINTS)
+    
+    // 清除当前所有系列
+    chart->removeAllSeries();
+    
+    // 根据当前选择的图表类型重新创建系列
+    int chartTypeIndex = ui->chartTypeComboBox->currentIndex();
+    
+    switch(chartTypeIndex)
     {
-        // 数据点少于最大显示数，显示所有数据
-        line_series->clear();
-        for(const QPointF &point : dataPoints)
+    case 0: // 折线图
+    {
+        line_series = new QLineSeries();
+        line_series->setName("折线图");
+        
+        if(totalPoints <= MAX_DISPLAY_POINTS)
         {
-            line_series->append(point);
+            // 数据点少于最大显示数，显示所有数据
+            for(const QPointF &point : dataPoints)
+            {
+                line_series->append(point);
+            }
+            axisX->setRange(0, qMax(MAX_DISPLAY_POINTS - 1, maxX));
         }
-        axisX->setRange(0, qMax(MAX_DISPLAY_POINTS - 1, maxX));
+        else
+        {
+            // 数据点超过最大显示数，只显示最近的数据
+            int startIdx = totalPoints - MAX_DISPLAY_POINTS;
+            for(int i = startIdx; i < totalPoints; i++)
+            {
+                line_series->append(dataPoints[i]);
+            }
+            axisX->setRange(startIdx, maxX);
+        }
+        
+        chart->addSeries(line_series);
+        line_series->attachAxis(axisX);
+        line_series->attachAxis(axisY);
+        break;
     }
-    else
+    case 1: // 柱状图
     {
-        // 数据点超过最大显示数，只显示最近的数据
-        int startIdx = totalPoints - MAX_DISPLAY_POINTS;
-        line_series->clear();
-        for(int i = startIdx; i < totalPoints; i++)
+        QBarSeries *bar_series = new QBarSeries();
+        QBarSet *bar_set = new QBarSet("柱状图");
+        
+        if(totalPoints <= MAX_DISPLAY_POINTS)
         {
-            line_series->append(dataPoints[i]);
+            // 数据点少于最大显示数，显示所有数据
+            for(const QPointF &point : dataPoints)
+            {
+                *bar_set << point.y();
+            }
+            axisX->setRange(0, qMax(MAX_DISPLAY_POINTS - 1, maxX));
         }
-        axisX->setRange(startIdx, maxX);
+        else
+        {
+            // 数据点超过最大显示数，只显示最近的数据
+            int startIdx = totalPoints - MAX_DISPLAY_POINTS;
+            for(int i = startIdx; i < totalPoints; i++)
+            {
+                *bar_set << dataPoints[i].y();
+            }
+            axisX->setRange(startIdx, maxX);
+        }
+        
+        bar_series->append(bar_set);
+        chart->addSeries(bar_series);
+        bar_series->attachAxis(axisX);
+        bar_series->attachAxis(axisY);
+        break;
+    }
+    case 2: // 散点图
+    {
+        QScatterSeries *scatter_series = new QScatterSeries();
+        scatter_series->setName("散点图");
+        scatter_series->setMarkerSize(8);
+        
+        if(totalPoints <= MAX_DISPLAY_POINTS)
+        {
+            // 数据点少于最大显示数，显示所有数据
+            for(const QPointF &point : dataPoints)
+            {
+                scatter_series->append(point);
+            }
+            axisX->setRange(0, qMax(MAX_DISPLAY_POINTS - 1, maxX));
+        }
+        else
+        {
+            // 数据点超过最大显示数，只显示最近的数据
+            int startIdx = totalPoints - MAX_DISPLAY_POINTS;
+            for(int i = startIdx; i < totalPoints; i++)
+            {
+                scatter_series->append(dataPoints[i]);
+            }
+            axisX->setRange(startIdx, maxX);
+        }
+        
+        chart->addSeries(scatter_series);
+        scatter_series->attachAxis(axisX);
+        scatter_series->attachAxis(axisY);
+        break;
+    }
+    default:
+        break;
     }
 }
 
@@ -166,44 +253,248 @@ void DataShowDialog::wheelEvent(QWheelEvent *event)
 
     int delta = event->angleDelta().y();
     int totalPoints = dataPoints.size();
-
+    
+    // 计算当前显示的起始索引
+    int currentStartIdx = 0;
+    if(totalPoints > MAX_DISPLAY_POINTS)
+    {
+        // 尝试从当前X轴范围获取起始索引
+        currentStartIdx = static_cast<int>(axisX->min());
+        // 确保起始索引在有效范围内
+        currentStartIdx = qMax(0, qMin(currentStartIdx, totalPoints - MAX_DISPLAY_POINTS));
+    }
+    
+    // 根据滚轮滚动方向调整起始索引
+    // 每次滚动调整1个数据点，这样滚动速度会变慢，便于在中间位置停留
     if(delta > 0)
     {
-        // 向上滚动 - 查看更新的数据
-        int startIdx = qMax(0, totalPoints - MAX_DISPLAY_POINTS);
-        line_series->clear();
-        for(int i = startIdx; i < totalPoints; i++)
-        {
-            line_series->append(dataPoints[i]);
-        }
-        axisX->setRange(startIdx, maxX);
+        // 向上滚动 - 查看更新的数据，起始索引增加
+        currentStartIdx = qMin(currentStartIdx + 1, totalPoints - MAX_DISPLAY_POINTS);
     }
     else
     {
-        // 向下滚动 - 查看更旧的数据
-        int endIdx = qMin(totalPoints, MAX_DISPLAY_POINTS);
-        line_series->clear();
-        for(int i = 0; i < endIdx; i++)
+        // 向下滚动 - 查看更旧的数据，起始索引减少
+        currentStartIdx = qMax(currentStartIdx - 1, 0);
+    }
+
+    // 清除当前所有系列
+    chart->removeAllSeries();
+    
+    // 根据当前选择的图表类型重新创建系列
+    int chartTypeIndex = ui->chartTypeComboBox->currentIndex();
+    
+    // 计算结束索引
+    int endIdx = qMin(currentStartIdx + MAX_DISPLAY_POINTS, totalPoints);
+    
+    switch(chartTypeIndex)
+    {
+    case 0: // 折线图
+    {
+        line_series = new QLineSeries();
+        line_series->setName("折线图");
+        for(int i = currentStartIdx; i < endIdx; i++)
         {
             line_series->append(dataPoints[i]);
         }
-        axisX->setRange(0, endIdx - 1);
+        chart->addSeries(line_series);
+        line_series->attachAxis(axisX);
+        line_series->attachAxis(axisY);
+        break;
     }
+    case 1: // 柱状图
+    {
+        QBarSeries *bar_series = new QBarSeries();
+        QBarSet *bar_set = new QBarSet("柱状图");
+        for(int i = currentStartIdx; i < endIdx; i++)
+        {
+            *bar_set << dataPoints[i].y();
+        }
+        bar_series->append(bar_set);
+        chart->addSeries(bar_series);
+        bar_series->attachAxis(axisX);
+        bar_series->attachAxis(axisY);
+        break;
+    }
+    case 2: // 散点图
+    {
+        QScatterSeries *scatter_series = new QScatterSeries();
+        scatter_series->setName("散点图");
+        scatter_series->setMarkerSize(8);
+        for(int i = currentStartIdx; i < endIdx; i++)
+        {
+            scatter_series->append(dataPoints[i]);
+        }
+        chart->addSeries(scatter_series);
+        scatter_series->attachAxis(axisX);
+        scatter_series->attachAxis(axisY);
+        break;
+    }
+    default:
+        break;
+    }
+    
+    // 更新X轴范围
+    axisX->setRange(currentStartIdx, endIdx - 1);
+    
     event->accept();
 }
 
 void DataShowDialog::on_clear_pushButton_clicked()
 {
-    line_series->clear();
+    // 清除所有系列
+    chart->removeAllSeries();
+    
+    // 重新创建坐标轴
+    chart->removeAxis(axisX);
+    chart->removeAxis(axisY);
+    
+    axisY = new QValueAxis();
+    axisX = new QValueAxis();
+    axisY->setLabelFormat("0x%X");
+    axisY->setTitleText("Value (Hex)");
+    axisX->setTitleText("Index");
+    
+    // 添加坐标轴
+    chart->addAxis(axisX, Qt::AlignBottom);
+    chart->addAxis(axisY, Qt::AlignLeft);
+    
+    // 根据当前选择的图表类型重新创建系列
+    int chartTypeIndex = ui->chartTypeComboBox->currentIndex();
+    
+    switch(chartTypeIndex)
+    {
+    case 0: // 折线图
+    {
+        line_series = new QLineSeries();
+        line_series->setName("折线图");
+        chart->addSeries(line_series);
+        line_series->attachAxis(axisX);
+        line_series->attachAxis(axisY);
+        break;
+    }
+    case 1: // 柱状图
+    {
+        QBarSeries *bar_series = new QBarSeries();
+        QBarSet *bar_set = new QBarSet("柱状图");
+        bar_series->append(bar_set);
+        chart->addSeries(bar_series);
+        bar_series->attachAxis(axisX);
+        bar_series->attachAxis(axisY);
+        break;
+    }
+    case 2: // 散点图
+    {
+        QScatterSeries *scatter_series = new QScatterSeries();
+        scatter_series->setName("散点图");
+        scatter_series->setMarkerSize(8);
+        chart->addSeries(scatter_series);
+        scatter_series->attachAxis(axisX);
+        scatter_series->attachAxis(axisY);
+        break;
+    }
+    default:
+        break;
+    }
+    
+    // 清除数据
     dataPoints.clear();
     maxX = std::numeric_limits<int>::min();
     maxY = std::numeric_limits<int>::min();
     index = 0;
     axisX->setRange(0, MAX_DISPLAY_POINTS - 1);
+    axisY->setRange(0, 100); // 设置默认Y轴范围
 }
 
 // 重置视图到最新数据
 void DataShowDialog::on_resetView_pushButton_clicked()
 {
+    autoScroll();
+}
+
+void DataShowDialog::on_chartTypeComboBox_currentIndexChanged(int chartTypeIndex)
+{
+    // 保存当前数据
+    QVector<QPointF> tempData = dataPoints;
+    int tempMaxX = maxX;
+    int tempMaxY = maxY;
+    int tempIndex = index;
+    
+    // 清除当前图表
+    chart->removeAllSeries();
+    chart->removeAxis(axisX);
+    chart->removeAxis(axisY);
+    
+    // 重新创建坐标轴
+    axisY = new QValueAxis();
+    axisX = new QValueAxis();
+    axisY->setLabelFormat("0x%X");
+    axisY->setTitleText("Value (Hex)");
+    axisX->setTitleText("Index");
+    
+    // 添加坐标轴
+    chart->addAxis(axisX, Qt::AlignBottom);
+    chart->addAxis(axisY, Qt::AlignLeft);
+    
+    // 根据选择的图表类型创建相应的系列
+    switch(chartTypeIndex)
+    {
+    case 0: // 折线图
+    {
+        line_series = new QLineSeries();
+        line_series->setName("折线图");
+        chart->addSeries(line_series);
+        line_series->attachAxis(axisX);
+        line_series->attachAxis(axisY);
+        break;
+    }
+    case 1: // 柱状图
+    {
+        QBarSeries *bar_series = new QBarSeries();
+        QBarSet *bar_set = new QBarSet("柱状图");
+        
+        for(const QPointF &point : tempData)
+        {
+            *bar_set << point.y();
+        }
+        
+        bar_series->append(bar_set);
+        chart->addSeries(bar_series);
+        bar_series->attachAxis(axisX);
+        bar_series->attachAxis(axisY);
+        break;
+    }
+    case 2: // 散点图
+    {
+        QScatterSeries *scatter_series = new QScatterSeries();
+        scatter_series->setName("散点图");
+        scatter_series->setMarkerSize(8);
+        
+        for(const QPointF &point : tempData)
+        {
+            scatter_series->append(point);
+        }
+        
+        chart->addSeries(scatter_series);
+        scatter_series->attachAxis(axisX);
+        scatter_series->attachAxis(axisY);
+        break;
+    }
+    default:
+        break;
+    }
+    
+    // 恢复数据
+    dataPoints = tempData;
+    maxX = tempMaxX;
+    maxY = tempMaxY;
+    index = tempIndex;
+    
+    // 更新Y轴范围
+    if(maxY > 0)
+    {
+        axisY->setRange(0, maxY);
+    }
+    
+    // 更新图表视图
     autoScroll();
 }

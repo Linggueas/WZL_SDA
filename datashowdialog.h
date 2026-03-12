@@ -11,8 +11,6 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class DataShowDialog; }
 QT_END_NAMESPACE
 
-QT_CHARTS_USE_NAMESPACE
-
 class DataShowDialog : public QDialog
 {
     Q_OBJECT
@@ -33,6 +31,7 @@ private slots:
     void on_start_show_data(QByteArray data);
     void on_clear_pushButton_clicked();
     void on_resetView_pushButton_clicked();
+    void on_chartTypeComboBox_currentIndexChanged(int index);
 
 private:
     void updateChartView();
